@@ -1,4 +1,4 @@
-module github.com/karthikeyansura/CS6650/HW1a
+module github.com/karthikeyansura/CS6650/HW1b
 
 go 1.25
 
