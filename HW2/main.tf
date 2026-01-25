@@ -12,11 +12,11 @@ variable "ssh_key_name" {
 
 # The provider of your cloud service, in this case it is AWS. 
 provider "aws" {
-  region     = "us-east-1" # Which region you are working on
+  region     = "us-east-1"
 }
 
 # Your ec2 instance
-resource "aws_instance" "demo-instance" {
+resource "aws_instance" "demo-instance-1" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = "t2.micro"
   # iam_instance_profile   = "LabInstanceProfile"
@@ -24,7 +24,19 @@ resource "aws_instance" "demo-instance" {
   key_name               = var.ssh_key_name
 
   tags = {
-    Name = "terraform-created-instance-:)"
+    Name = "terraform-created-instance-1"
+  }
+}
+
+resource "aws_instance" "demo-instance-2" {
+  ami                    = data.aws_ami.al2023.id
+  instance_type          = "t2.micro"
+  # iam_instance_profile   = "LabInstanceProfile"
+  vpc_security_group_ids = [aws_security_group.ssh.id]
+  key_name               = var.ssh_key_name
+
+  tags = {
+    Name = "terraform-created-instance-2"
   }
 }
 
@@ -65,6 +77,10 @@ data "aws_ami" "al2023" {
   }
 }
 
-output "ec2_public_dns" {
-  value = aws_instance.demo-instance.public_dns
+output "ec2_1_dns" {
+  value = aws_instance.demo-instance-1.public_dns
+}
+
+output "ec2_2_dns" {
+  value = aws_instance.demo-instance-2.public_dns
 }
