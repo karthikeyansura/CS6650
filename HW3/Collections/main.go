@@ -32,6 +32,6 @@ func main() {
 	// Wait for all goroutines to finish
 	wg.Wait()
 
-	// Print the map length if program survives
-	fmt.Println("Map length:", len(m))
+	// Print the map size if program survives
+	fmt.Println("Map size:", len(m))
 }
