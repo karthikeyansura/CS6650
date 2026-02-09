@@ -2,6 +2,7 @@ import requests
 import time
 import json
 import sys
+import concurrent.futures
 
 # Configuration
 BUCKET = "cs6650-mapreduce-wordcount"
@@ -44,7 +45,6 @@ def run_pipeline():
     pipeline_start = time.time()
 
     # Phase 1: Split
-    # The splitter divides the input file into chunks based on the number of mappers
     print("\nPhase 1: Split")
     split_url = f"{SPLITTER}/split?bucket={BUCKET}&key={KEY}&n={len(MAPPERS)}"
     split_data, split_time = call_service("SPLITTER", split_url)
@@ -53,30 +53,31 @@ def run_pipeline():
     chunks = split_data.get("chunks", [])
     print(f"Chunks created: {chunks}")
 
-    # Phase 2: Map
-    # Each chunk is processed by a mapper in a round-robin fashion
+    # Phase 2: Map (True Parallelism)
     print("\nPhase 2: Map")
-    map_results = []
-    map_times = []
+    map_results = [None] * len(chunks)
+    map_times = [0] * len(chunks)
 
-    for i, chunk in enumerate(chunks):
-        mapper_url = MAPPERS[i % len(MAPPERS)]
-        map_url = f"{mapper_url}/map?bucket={BUCKET}&key={chunk}&id={i}"
+    def process_chunk(index):
+        chunk = chunks[index]
+        mapper_url = MAPPERS[index % len(MAPPERS)]
+        map_url = f"{mapper_url}/map?bucket={BUCKET}&key={chunk}&id={index}"
+        data, elapsed = call_service(f"MAPPER-{index}", map_url)
+        return index, data.get("result"), elapsed
 
-        map_data, map_time = call_service(f"MAPPER-{i}", map_url)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+        future_to_mapper = {executor.submit(process_chunk, i): i for i in range(len(chunks))}
 
-        map_results.append(map_data.get("result"))
-        map_times.append(map_time)
-
-        total_words = map_data.get("total_words", 0)
-        unique_words = map_data.get("unique_words", 0)
-        print(f"Mapper-{i} stats: {total_words} words, {unique_words} unique")
+        for future in concurrent.futures.as_completed(future_to_mapper):
+            i, result_key, elapsed = future.result()
+            map_results[i] = result_key
+            map_times[i] = elapsed
+            print(f"Mapper-{i} finished in {elapsed:.3f}s")
 
     timings["map_individual"] = map_times
-    timings["map_total"] = sum(map_times)
+    timings["map_total"] = max(map_times)
 
     # Phase 3: Reduce
-    # The reducer aggregates all intermediate map results
     print("\nPhase 3: Reduce")
     keys_param = ",".join(map_results)
     reduce_url = f"{REDUCER}/reduce?bucket={BUCKET}&keys={keys_param}"
@@ -96,7 +97,7 @@ def run_pipeline():
 
     print("\nTiming Analysis")
     print(f"Split Phase:   {timings['split']:.3f}s")
-    print(f"Map Phase:     {timings['map_total']:.3f}s (cumulative)")
+    print(f"Map Phase:     {timings['map_total']:.3f}s")
     print(f"Reduce Phase:  {timings['reduce']:.3f}s")
     print(f"Total time: {total_duration:.3f}s")
 
