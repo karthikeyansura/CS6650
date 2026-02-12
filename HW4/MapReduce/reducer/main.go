@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -30,6 +31,12 @@ type WordCount struct {
 	Count int    `json:"count"`
 }
 
+// mapResult holds the decoded partial counts or an error from a goroutine
+type mapResult struct {
+	counts map[string]int
+	err    error
+}
+
 func main() {
 	r := gin.Default()
 
@@ -52,29 +59,52 @@ func main() {
 		keys := strings.Split(keysStr, ",")
 		finalCounts := make(map[string]int)
 
-		// Read and aggregate all mapper results from S3
-		for _, key := range keys {
-			key = strings.TrimSpace(key)
-			obj, err := svc.GetObject(&s3.GetObjectInput{
-				Bucket: aws.String(bucket),
-				Key:    aws.String(key),
-			})
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read " + key + ": " + err.Error()})
-				return
-			}
+		// Read all mapper results from S3 in parallel using goroutines
+		var wg sync.WaitGroup
+		ch := make(chan mapResult, len(keys))
 
-			// Decode mapper JSON output
-			var partialCounts map[string]int
-			if err := json.NewDecoder(obj.Body).Decode(&partialCounts); err != nil {
+		for _, key := range keys {
+			wg.Add(1)
+			go func(k string) {
+				defer wg.Done()
+				k = strings.TrimSpace(k)
+				obj, err := svc.GetObject(&s3.GetObjectInput{
+					Bucket: aws.String(bucket),
+					Key:    aws.String(k),
+				})
+				if err != nil {
+					ch <- mapResult{err: fmt.Errorf("Failed to read %s: %s", k, err.Error())}
+					return
+				}
+
+				// Decode mapper JSON output
+				var partialCounts map[string]int
+				if err := json.NewDecoder(obj.Body).Decode(&partialCounts); err != nil {
+					obj.Body.Close()
+					ch <- mapResult{err: fmt.Errorf("Failed to parse %s: %s", k, err.Error())}
+					return
+				}
 				obj.Body.Close()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse " + key + ": " + err.Error()})
+
+				ch <- mapResult{counts: partialCounts}
+			}(key)
+		}
+
+		// Close channel once all goroutines finish
+		go func() {
+			wg.Wait()
+			close(ch)
+		}()
+
+		// Aggregate all mapper results (single goroutine, no mutex needed)
+		for result := range ch {
+			if result.err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": result.err.Error()})
 				return
 			}
-			obj.Body.Close()
 
 			// Merge into finalCounts
-			for word, count := range partialCounts {
+			for word, count := range result.counts {
 				finalCounts[word] += count
 			}
 		}
