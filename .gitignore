@@ -18,3 +18,5 @@ HW/Keys/
 *.jsonl
 *.pdf
 *.zip
+**/__pycache__/
+*.pyc
