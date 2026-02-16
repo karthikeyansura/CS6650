@@ -89,7 +89,7 @@ func parseProductID(c *gin.Context) (int, bool) {
 }
 
 // getProduct handles GET /products/:productId.
-// Returns 200 with product JSON if found, 400 if product does not exist, or 404 if productId is invalid.
+// Returns 200 with product JSON if found, 404 if product does not exist, or 400 if productId is invalid.
 func getProduct(c *gin.Context) {
 	id, ok := parseProductID(c)
 	if !ok {
