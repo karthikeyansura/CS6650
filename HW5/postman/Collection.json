@@ -1,0 +1,111 @@
+{
+  "info": {
+    "_postman_id": "02f164fc-3248-4871-847b-4d05ead92841",
+    "name": "Product Service API",
+    "description": "# Product Service API\n\nIntegration tests for the **Product Service**, a thread-safe REST API built in Go with Gin, deployed to AWS ECS Fargate via Terraform.\n\n## Getting Started\n\nThis collection uses **Environment Variables** for switching between Local and AWS targets.\n\n### Setup\n\n1. Import this collection into Postman.\n    \n2. Import the `Local` and `AWS` environments.\n    \n3. Select the appropriate environment from the top-right dropdown.\n    \n\n| Variable | Local | AWS |\n| --- | --- | --- |\n| `baseUrl` | `http://localhost:8080` | `http://<fargate-public-ip>:8080` |\n\n## Endpoints\n\n### Health Check\n\n- **GET /health** - Returns `{\"status\": \"ok\"}` (200)\n    \n\n### Product Management\n\n- **POST /products/:id/details** - Creates a product (204 No Content)\n    \n- **GET /products/:id** - Retrieves product by ID (200)\n    \n\n### Error Cases\n\n- **GET /products/999** - Product not found (404)\n    \n- **GET /products/abc** - Invalid product ID (400)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52400206",
+    "_collection_link": "https://go.postman.co/collection/52400206-02f164fc-3248-4871-847b-4d05ead92841?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Add Product",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 1,\n  \"sku\": \"ABC-123-XYZ\",\n  \"manufacturer\": \"Acme Corporation\",\n  \"category_id\": 456,\n  \"weight\": 1250,\n  \"some_other_id\": 789\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/1/details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "1",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Product",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "999"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Invalid ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/abc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "abc"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
