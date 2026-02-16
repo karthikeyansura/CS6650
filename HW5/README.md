@@ -162,6 +162,31 @@ GET /products/abc → 400
 }
 ```
 
+### Error: Missing Required Fields
+```
+POST /products/2/details → 400
+```
+```json
+{
+  "error": "INVALID_INPUT",
+  "message": "Missing required fields",
+  "details": "sku is required"
+}
+```
+
+### Error: ID Mismatch
+```
+POST /products/3/details → 400
+Body: {"product_id": 99, ...}
+```
+```json
+{
+  "error": "INVALID_INPUT",
+  "message": "Product ID mismatch",
+  "details": "URL product ID 3 does not match body product ID 99"
+}
+```
+
 ### Response Codes
 
 | Code | Method | Condition |

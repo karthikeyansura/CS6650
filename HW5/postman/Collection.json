@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "02f164fc-3248-4871-847b-4d05ead92841",
     "name": "Product Service API",
-    "description": "# Product Service API\n\nIntegration tests for the **Product Service**, a thread-safe REST API built in Go with Gin, deployed to AWS ECS Fargate via Terraform.\n\n## Getting Started\n\nThis collection uses **Environment Variables** for switching between Local and AWS targets.\n\n### Setup\n\n1. Import this collection into Postman.\n    \n2. Import the `Local` and `AWS` environments.\n    \n3. Select the appropriate environment from the top-right dropdown.\n    \n\n| Variable | Local | AWS |\n| --- | --- | --- |\n| `baseUrl` | `http://localhost:8080` | `http://<fargate-public-ip>:8080` |\n\n## Endpoints\n\n### Health Check\n\n- **GET /health** - Returns `{\"status\": \"ok\"}` (200)\n    \n\n### Product Management\n\n- **POST /products/:id/details** - Creates a product (204 No Content)\n    \n- **GET /products/:id** - Retrieves product by ID (200)\n    \n\n### Error Cases\n\n- **GET /products/999** - Product not found (404)\n    \n- **GET /products/abc** - Invalid product ID (400)",
+    "description": "# Product Service API\n\nIntegration tests for the **Product Service**, a thread-safe REST API built in Go with Gin, deployed to AWS ECS Fargate via Terraform.\n\n## Getting Started\n\nThis collection uses **Environment Variables** for switching between Local and AWS targets.\n\n### Setup\n\n1. Import this collection into Postman.\n    \n2. Import the `Local` and `AWS` environments.\n    \n3. Select the appropriate environment from the top-right dropdown.\n    \n\n| Variable | Local | AWS |\n| --- | --- | --- |\n| `baseUrl` | `http://localhost:8080` | `http://<fargate-public-ip>:8080` |\n\n## Endpoints\n\n### Health Check\n\n- **GET /health** - Returns `{\"status\": \"ok\"}` (200)\n    \n\n### Product Management\n\n- **POST /products/:id/details** - Creates a product (204 No Content)\n    \n- **GET /products/:id** - Retrieves product by ID (200)\n    \n\n### Error Cases\n\n- **GET /products/999** - Product not found (404)\n    \n- **GET /products/abc** - Invalid product ID (400)\n    \n- **POST /products/2/details** - Request body missing required `sku` field (400)\n    \n- **POST /products/3/details** - URL path ID `3` conflicts with body `product_id: 99` (400)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "52400206",
     "_collection_link": "https://go.postman.co/collection/52400206-02f164fc-3248-4871-847b-4d05ead92841?source=collection_link"
@@ -102,6 +102,62 @@
           "path": [
             "products",
             "abc"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Missing Fields",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 2,\n  \"manufacturer\": \"Test Corp\",\n  \"category_id\": 1,\n  \"weight\": 100,\n  \"some_other_id\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/2/details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "2",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - ID Mismatch",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 99,\n  \"sku\": \"MISMATCH-SKU\",\n  \"manufacturer\": \"Test Corp\",\n  \"category_id\": 1,\n  \"weight\": 100,\n  \"some_other_id\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/3/details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "3",
+            "details"
           ]
         }
       },
