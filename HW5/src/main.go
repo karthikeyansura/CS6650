@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"sync"
@@ -128,11 +129,11 @@ func addProductDetails(c *gin.Context) {
 	}
 
 	// Validate required fields and constraints
-	if err := validateProduct(product); err != "" {
+	if err := validateProduct(product); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_INPUT",
 			Message: "Missing or invalid required fields",
-			Details: err,
+			Details: err.Error(),
 		})
 		return
 	}
@@ -152,31 +153,31 @@ func addProductDetails(c *gin.Context) {
 }
 
 // validateProduct validates required fields and constraints.
-// Returns an error message if validation fails; or an empty string on success.
-func validateProduct(p Product) string {
+// Returns an error if validation fails; or nil on success.
+func validateProduct(p Product) error {
 	if p.ProductID < 1 {
-		return "product_id must be a positive integer"
+		return errors.New("product_id must be a positive integer")
 	}
 	if p.SKU == "" {
-		return "sku is required and cannot be empty"
+		return errors.New("sku is required and cannot be empty")
 	}
 	if len(p.SKU) > 100 {
-		return "sku must be at most 100 characters"
+		return errors.New("sku must be at most 100 characters")
 	}
 	if p.Manufacturer == "" {
-		return "manufacturer is required and cannot be empty"
+		return errors.New("manufacturer is required and cannot be empty")
 	}
 	if len(p.Manufacturer) > 200 {
-		return "manufacturer must be at most 200 characters"
+		return errors.New("manufacturer must be at most 200 characters")
 	}
 	if p.CategoryID < 1 {
-		return "category_id must be a positive integer"
+		return errors.New("category_id must be a positive integer")
 	}
 	if p.Weight < 0 {
-		return "weight must be a non-negative integer"
+		return errors.New("weight must be a non-negative integer")
 	}
 	if p.SomeOtherID < 1 {
-		return "some_other_id must be a positive integer"
+		return errors.New("some_other_id must be a positive integer")
 	}
-	return ""
+	return nil
 }
