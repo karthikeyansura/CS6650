@@ -1,0 +1,233 @@
+{
+  "info": {
+    "_postman_id": "fd93ccec-8519-4d30-9787-4d31d96c9326",
+    "name": "Product Service API",
+    "description": "# Product Service API\n\nIntegration tests for the **Product Service**, a thread-safe REST API built in Go with Gin, deployed to AWS ECS Fargate via Terraform.\n\n## Getting Started\n\nThis collection uses **Environment Variables** for switching between Local and AWS targets.\n\n### Setup\n\n1. Import this collection into Postman.\n    \n2. Import the `Local` and `AWS` environments.\n    \n3. Select the appropriate environment from the top-right dropdown.\n    \n\n| Variable | Local | AWS |\n| --- | --- | --- |\n| `baseUrl` | `http://localhost:8080` | `http://<alb-dns-name>` |\n\n## Endpoints\n\n### Health Check\n\n- **GET /health** - Returns `{\"status\": \"ok\"}` (200)\n    \n\n### Product Management\n\n- **POST /products/:id/details** - Creates a product (204 No Content)  \n    _Request Body:_\n    \n    ``` json\n      { \"product_id\": 1, \"sku\": \"ABC-123\", \"manufacturer\": \"Acme\", \"category_id\": 456, \"weight\": 1250, \"some_other_id\": 789 }\n    \n     ```\n    \n- **GET /products/:id** - Retrieves product by ID (200)\n    \n\n### Product Search\n\n- **GET /products/search?q=term** - Searches the product catalog for the given term. Scans 100 random products per request to simulate a fixed compute workload (200)\n    \n\n### Error Cases\n\n- **GET /products/999** - Product not found (404)  \n    _Response:_\n    \n    ``` json\n      {\n        \"error\": \"NOT_FOUND\",\n        \"message\": \"Product not found\",\n        \"details\": \"No product exists with ID 999\"\n      }\n    \n     ```\n    \n- **GET /products/abc** - Invalid product ID (400)  \n    _Response:_\n    \n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Invalid product ID\",\n        \"details\": \"Product ID must be a positive integer\"\n      }\n    \n     ```\n    \n- **GET /products/search** - Missing search query `q` (400)  \n    _Response:_\n    \n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Missing search query\",\n        \"details\": \"Query parameter 'q' is required\"\n      }\n    \n     ```\n    \n- **POST /products/2/details** - Request body missing required `sku` field (400)  \n    _Request Body:_\n    \n    ``` json\n      { \"product_id\": 2, \"manufacturer\": \"Test Corp\", \"category_id\": 1, \"weight\": 100, \"some_other_id\": 1 }\n    \n     ```\n    \n    _Response:_\n    \n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Missing or invalid required fields\",\n        \"details\": \"sku is required and cannot be empty\"\n      }\n    \n     ```\n    \n- **POST /products/3/details** - URL path ID `3` conflicts with body `product_id: 99` (400)  \n    _Request Body:_\n    \n    ``` json\n      { \"product_id\": 99, \"sku\": \"MISMATCH\", \"manufacturer\": \"Test Corp\", \"category_id\": 1, \"weight\": 100, \"some_other_id\": 1 }\n    \n     ```\n    \n    _Response:_\n    \n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Product ID mismatch\",\n        \"details\": \"Path product ID does not match body product_id\"\n      }\n    \n     ```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52400206",
+    "_collection_link": "https://go.postman.co/collection/52400206-fd93ccec-8519-4d30-9787-4d31d96c9326?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Add Product",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 1,\n  \"sku\": \"ABC-123-XYZ\",\n  \"manufacturer\": \"Acme Corporation\",\n  \"category_id\": 456,\n  \"weight\": 1250,\n  \"some_other_id\": 789\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/1/details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "1",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Product",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/search?q=Electronics",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "Electronics"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - No Match",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/search?q=xyznonexistent",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "xyznonexistent"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Missing Search Query",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/search",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "search"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "999"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Invalid ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/products/abc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "abc"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Missing Fields",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 2,\n  \"manufacturer\": \"Test Corp\",\n  \"category_id\": 1,\n  \"weight\": 100,\n  \"some_other_id\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/2/details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "2",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - ID Mismatch",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 99,\n  \"sku\": \"MISMATCH-SKU\",\n  \"manufacturer\": \"Test Corp\",\n  \"category_id\": 1,\n  \"weight\": 100,\n  \"some_other_id\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/products/3/details",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "products",
+            "3",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
