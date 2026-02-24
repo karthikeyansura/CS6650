@@ -1,4 +1,5 @@
 # Locust load tests for the Product Search API using FastHttpUser.
+# Test classes are selectable via the --class-picker flag in Locust UI.
 import random
 from locust import FastHttpUser, task, between
 
