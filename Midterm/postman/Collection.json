@@ -1,0 +1,430 @@
+{
+  "info": {
+    "_postman_id": "c68413e7-12d2-4368-b2ea-e32fd1bb7299",
+    "name": "Product and Inventory Service API",
+    "description": "# Product and Inventory Service API\n\nIntegration tests for the **Product and Inventory Service**, a crash & recovery experiment extending the Product Service with a dependent Inventory microservice, chaos engineering, and resilience patterns (fail-fast, circuit breaker, bulkhead).\n\n## Getting Started\n\nThis collection uses **Environment Variables** for switching between Product and Inventory service targets.\n\n### Setup\n\n1. Import this collection into Postman.\n2. Import the `Local` environment.\n3. Select the appropriate environment from the top-right dropdown.\n\n| Variable | Local |\n| --- | --- |\n| `productUrl` | `http://localhost:8080` |\n| `inventoryUrl` | `http://localhost:8081` |\n\n## Endpoints\n\n### Health & Metrics\n\n- **GET /health** - Returns `{\"status\": \"ok\", \"resilience_mode\": \"...\"}` (200)\n- **GET /metrics** - Returns circuit breaker and bulkhead statistics (200)\n\n### Product Management\n\n- **POST /products/:id/details** - Creates a product (204 No Content)\n    _Request Body:_\n\n    ``` json\n      { \"product_id\": 1, \"sku\": \"ABC-123\", \"manufacturer\": \"Acme\", \"category_id\": 456, \"weight\": 1250, \"some_other_id\": 789 }\n\n     ```\n\n- **GET /products/:id** - Retrieves product by ID (200)\n\n### Product Search\n\n- **GET /products/search?q=term** - Searches the product catalog for the given term. Scans 100 random products per request to simulate a fixed compute workload (200)\n\n### Inventory-Enriched Endpoints\n\n- **GET /products/search/inventory?q=term** - Searches the catalog and enriches each result with live inventory data from the Inventory Service. Returns `inventory_source` indicating data origin: `\"live\"`, `\"circuit-open\"`, `\"bulkhead-rejected\"`, or `\"error\"` (200)\n\n- **GET /products/:id/inventory** - Retrieves a single product enriched with inventory data (200)\n\n### Inventory Service\n\n- **GET /inventory/:id** - Returns stock count, warehouse, and timestamp for a product (200)\n\n### Chaos Engineering\n\n- **POST /chaos/off** - Normal operation\n- **POST /chaos/slow?delay_ms=3000** - Inject latency per inventory request\n- **POST /chaos/error** - Return 500 for all inventory requests\n- **POST /chaos/partial?delay_ms=2000** - 50% error, 50% slow\n- **GET /chaos** - Check current chaos mode\n\n### Error Cases\n\n- **GET /products/999** - Product not found (404)\n    _Response:_\n\n    ``` json\n      {\n        \"error\": \"NOT_FOUND\",\n        \"message\": \"Product not found\",\n        \"details\": \"No product exists with ID 999\"\n      }\n\n     ```\n\n- **GET /products/abc** - Invalid product ID (400)\n    _Response:_\n\n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Invalid product ID\",\n        \"details\": \"Product ID must be a positive integer\"\n      }\n\n     ```\n\n- **GET /products/search** - Missing search query `q` (400)\n    _Response:_\n\n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Missing search query\",\n        \"details\": \"Query parameter 'q' is required\"\n      }\n\n     ```\n\n- **POST /products/2/details** - Request body missing required `sku` field (400)\n    _Request Body:_\n\n    ``` json\n      { \"product_id\": 2, \"manufacturer\": \"Test Corp\", \"category_id\": 1, \"weight\": 100, \"some_other_id\": 1 }\n\n     ```\n\n    _Response:_\n\n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Missing or invalid required fields\",\n        \"details\": \"sku is required and cannot be empty\"\n      }\n\n     ```\n\n- **POST /products/3/details** - URL path ID `3` conflicts with body `product_id: 99` (400)\n    _Request Body:_\n\n    ``` json\n      { \"product_id\": 99, \"sku\": \"MISMATCH\", \"manufacturer\": \"Test Corp\", \"category_id\": 1, \"weight\": 100, \"some_other_id\": 1 }\n\n     ```\n\n    _Response:_\n\n    ``` json\n      {\n        \"error\": \"INVALID_INPUT\",\n        \"message\": \"Product ID mismatch\",\n        \"details\": \"Path product ID does not match body product_id\"\n      }\n\n     ```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52400206",
+    "_collection_link": "https://go.postman.co/collection/52400206-c68413e7-12d2-4368-b2ea-e32fd1bb7299?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/health",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Resilience Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/metrics",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Add Product",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 1,\n  \"sku\": \"ABC-123-XYZ\",\n  \"manufacturer\": \"Acme Corporation\",\n  \"category_id\": 456,\n  \"weight\": 1250,\n  \"some_other_id\": 789\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{productUrl}}/products/1/details",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "1",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Product",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/1",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/search?q=Electronics",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "Electronics"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Products with Inventory",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/search/inventory?q=Electronics",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "search",
+            "inventory"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "Electronics"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Product with Inventory",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/1/inventory",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "1",
+            "inventory"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search - No Match",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/search?q=xyznonexistent",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "xyznonexistent"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Inventory - Get Stock",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/inventory/1",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "inventory",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Inventory - Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/health",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chaos - Check Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/chaos",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "chaos"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chaos - Off (Normal)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/chaos/off",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "chaos",
+            "off"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chaos - Slow (3s delay)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/chaos/slow?delay_ms=3000",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "chaos",
+            "slow"
+          ],
+          "query": [
+            {
+              "key": "delay_ms",
+              "value": "3000"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chaos - Error (500s)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/chaos/error",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "chaos",
+            "error"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chaos - Partial (50% fail)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{inventoryUrl}}/chaos/partial?delay_ms=2000",
+          "host": [
+            "{{inventoryUrl}}"
+          ],
+          "path": [
+            "chaos",
+            "partial"
+          ],
+          "query": [
+            {
+              "key": "delay_ms",
+              "value": "2000"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Missing Search Query",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/search",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "search"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/999",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "999"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Invalid ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{productUrl}}/products/abc",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "abc"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Missing Fields",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 2,\n  \"manufacturer\": \"Test Corp\",\n  \"category_id\": 1,\n  \"weight\": 100,\n  \"some_other_id\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{productUrl}}/products/2/details",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "2",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - ID Mismatch",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 99,\n  \"sku\": \"MISMATCH-SKU\",\n  \"manufacturer\": \"Test Corp\",\n  \"category_id\": 1,\n  \"weight\": 100,\n  \"some_other_id\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{productUrl}}/products/3/details",
+          "host": [
+            "{{productUrl}}"
+          ],
+          "path": [
+            "products",
+            "3",
+            "details"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
