@@ -1,0 +1,47 @@
+services:
+  inventory:
+    build: ./inventory
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  product:
+    build: ./product
+    ports:
+      - "8080:8080"
+    environment:
+      - INVENTORY_URL=http://inventory:8081
+      - RESILIENCE_MODE=${RESILIENCE_MODE:-none}
+    depends_on:
+      inventory:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  locust-master:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locust:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --master --class-picker
+    depends_on:
+      product:
+        condition: service_healthy
+
+  locust-worker:
+    image: locustio/locust
+    volumes:
+      - ./locust:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --worker --master-host locust-master
+    depends_on:
+      - locust-master
+    deploy:
+      replicas: 2
