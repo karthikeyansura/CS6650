@@ -1,0 +1,51 @@
+diff --git a/clients/dynamodb.js b/clients/dynamodb.js
+index 700494c..4291536 100644
+--- a/clients/dynamodb.js
++++ b/clients/dynamodb.js
+@@ -81,6 +81,7 @@ const getMedia = async (mediaId) => {
+       name: Item.name.S,
+       mimetype: Item.mimetype.S,
+       status: Item.status.S,
++      width: Number(Item.width.N),
+     };
+   } catch (error) {
+     logger.error(error);
+@@ -151,7 +152,7 @@ const setMediaStatus = async ({ mediaId, newStatus }) => {
+     TableName,
+     Key: {
+       PK: { S: `MEDIA#${mediaId}` },
+-      SK: { S: 'metadata' },
++      SK: { S: 'METADATA' },
+     },
+     UpdateExpression: 'SET #status = :newStatus',
+     ExpressionAttributeNames: { '#status': 'status' },
+diff --git a/controllers/media.js b/controllers/media.js
+index 6bb1c50..8f3b61f 100644
+--- a/controllers/media.js
++++ b/controllers/media.js
+@@ -105,10 +105,10 @@ const downloadController = async (req, res) => {
+       return;
+     }
+ 
+-    if (media.status !== MEDIA_STATUS.PROCESSING) {
++    if (media.status !== MEDIA_STATUS.COMPLETE) {
+       const SIXTY_SECONDS = 60;
+       res.set('Retry-After', SIXTY_SECONDS);
+-      res.set('Location', `${req.hostname}/v1/media/${mediaId}/status`);
++      res.set('Location', `http://${req.get('host')}/v1/media/${mediaId}/status`);
+       logger.info(
+         { mediaId, currentStatus: media.status },
+         'Media not ready for download, sending 202'
+diff --git a/server.js b/server.js
+index 454790a..46ce716 100644
+--- a/server.js
++++ b/server.js
+@@ -32,7 +32,7 @@ app.get('/health', (req, res) => {
+ 
+ app.use('/v1/media', mediaRoutes);
+ 
+-const port = process.env.APP_PORT;
++const port = process.env.APP_PORT || 9000;
+ 
+ app.listen(port, () => {
+   logger.info(`Example app listening on port ${port}`);
