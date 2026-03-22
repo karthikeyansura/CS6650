@@ -1,0 +1,9 @@
+variable "service_name" {
+  description = "Base name for SG"
+  type        = string
+}
+
+variable "container_port" {
+  description = "Port to expose on the SG"
+  type        = number
+}
