@@ -33,9 +33,11 @@ HW8/
 ├── test/
 │   ├── test_performance.py   # 150-operation performance test
 │   ├── test_consistency.py   # DynamoDB eventual consistency test
-│   └── combine_results.py    # STEP III comparison analysis
+│   └── combine_results.py    # Comparison analysis
 ├── postman/
-│   └── Collection.json       # Postman collection for manual testing
+│   ├── Collection.json       # Postman collection
+│   └── AWS.env.json          # AWS environment variables
+├── docs/                     # Screenshots and report
 └── README.md
 ```
 
