@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-03-23T13:48:40.692377+00:00",
+  "read_after_write": {
+    "stale_reads": 0,
+    "total_trials": 20,
+    "avg_read_ms": 10.358
+  },
+  "add_then_read": {
+    "stale_reads": 0,
+    "total_trials": 20
+  },
+  "rapid_updates": {
+    "expected": 30,
+    "actual": 30,
+    "all_present": true
+  }
+}
