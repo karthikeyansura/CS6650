@@ -1,0 +1,261 @@
+{
+  "info": {
+    "_postman_id": "d3ce7c9f-21bf-49f3-a06c-1a4ef58a3648",
+    "name": "Shopping Cart API",
+    "description": "# Shopping Cart API\n\nIntegration tests for the **Shopping Cart Service** comparing MySQL and DynamoDB backends.\n\n## Getting Started\n\nThis collection uses **Environment Variables** for switching between Local and AWS targets.\n\n### Setup\n\n1. Import this collection into Postman.\n2. Ensure you have your `Local` and `AWS` environments active.\n3. Select the appropriate environment from the top-right dropdown.\n\n| Variable | Local | AWS |\n| --- | --- | --- |\n| `baseUrl` | `http://localhost:8080` | `http://<alb-dns-name>` |\n\n## Endpoints\n\n### Health Check\n- **GET /health** - Returns `{\"status\": \"ok\", \"db_mode\": \"<mode>\"}` (200)\n\n### Cart Management\n- **POST /shopping-carts** - Creates a new cart (201)\n- **GET /shopping-carts/:id** - Retrieves a cart and its items (200)\n- **POST /shopping-carts/:id/items** - Upserts items to the cart (204 No Content)\n\n### Error Cases Evaluated\n- **404 Not Found** - Non-existent cart IDs\n- **400 Bad Request** - Invalid Cart ID (string instead of int for MySQL)\n- **400 Bad Request** - Missing `customer_id` upon creation\n- **400 Bad Request** - Missing or negative `product_id` / `quantity` upon adding items",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52400206",
+    "_collection_link": "https://go.postman.co/collection/52400206-d3ce7c9f-21bf-49f3-a06c-1a4ef58a3648?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Shopping Cart",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    var body = pm.response.json();",
+              "    pm.collectionVariables.set('cart_id', body.shopping_cart_id);",
+              "    pm.test('Cart created', function() {",
+              "        pm.expect(body.shopping_cart_id).to.not.be.undefined;",
+              "    });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer_id\": 1001\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Add Item to Cart",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 5001,\n  \"quantity\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/{{cart_id}}/items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "{{cart_id}}",
+            "items"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Shopping Cart",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/{{cart_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "{{cart_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Add Second Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 5002,\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/{{cart_id}}/items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "{{cart_id}}",
+            "items"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Cart After Adding Items",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/{{cart_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "{{cart_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Get Non-Existent Cart (404)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/99999999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "99999999"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Invalid Cart ID (400)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/abc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "abc"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Create Cart Missing Fields (400)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Error - Add Item Missing Quantity (400)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": 5001\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shopping-carts/{{cart_id}}/items",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shopping-carts",
+            "{{cart_id}}",
+            "items"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "cart_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
