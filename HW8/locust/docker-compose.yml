@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  locust-master:
+    image: locustio/locust:2.32.4
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./:/mnt/locust
+    command: >
+      -f /mnt/locust/locustfile.py
+      --master
+      -H ${TARGET_HOST:-http://localhost:8080}
+
+  locust-worker:
+    image: locustio/locust:2.32.4
+    volumes:
+      - ./:/mnt/locust
+    command: >
+      -f /mnt/locust/locustfile.py
+      --worker
+      --master-host locust-master
+    deploy:
+      replicas: 2
+    depends_on:
+      - locust-master
