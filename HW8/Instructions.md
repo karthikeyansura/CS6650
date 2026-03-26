@@ -31,7 +31,7 @@ Add RDS MySQL to your existing Terraform configuration. Create an RDS module wit
 Part 2: Database Schema Implementation
 --------------------------------------
 
-Refer to the E-commerce's [OpenAPI Specification](../Homework%205/api.yaml)  
+Refer to the E-commerce's [OpenAPI Specification](../HW5/api.yaml)  
 ### Database Requirements Your Schema Must Support
 
 **Functional Requirements:**
