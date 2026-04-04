@@ -1,0 +1,13 @@
+{
+  "coordinator": "http://localhost:8092",
+  "stale_seen_before_ack": true,
+  "eventual_read_coordinator": 200,
+  "eventual_read_other": 200,
+  "observations": [
+    {
+      "node": "http://localhost:8091",
+      "status": 404,
+      "time": 1775258885.901865
+    }
+  ]
+}
