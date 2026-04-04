@@ -1,0 +1,16 @@
+services:
+  locust:
+    image: locustio/locust:2.38.0
+    working_dir: /mnt/locust
+    volumes:
+      - ./:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host=http://placeholder
+    ports:
+      - "8089:8089"
+    environment:
+      MODE: ${MODE:-leader-follower}
+      LEADER_HOST: ${LEADER_HOST:-http://host.docker.internal:8081}
+      NODE_HOSTS: ${NODE_HOSTS:-http://host.docker.internal:8081,http://host.docker.internal:8082,http://host.docker.internal:8083,http://host.docker.internal:8084,http://host.docker.internal:8085}
+      WRITE_PERCENT: ${WRITE_PERCENT:-10}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
