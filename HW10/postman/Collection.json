@@ -1,0 +1,407 @@
+{
+  "info": {
+    "_postman_id": "ab62a556-016e-4ce5-87b1-0ba704334bdd",
+    "name": "Distributed KV Store API",
+    "description": "# Distributed KV Store API\n\nIntegration tests for the Distributed Key-Value Store, an in-memory replicated database built in Go, deployed via Docker Compose (local) or AWS ECS Fargate with Cloud Map (AWS).\n\n## Getting Started\n\nThis collection uses Environment Variables for switching between Local and AWS targets.\n\n### Setup\n\n1. Import this collection into Postman.\n    \n2. Import the Local and AWS environments.\n    \n3. Select the appropriate environment from the top-right dropdown.\n    \n| Variable        | Local                   | AWS            |\n|-----------------|-------------------------|----------------|\n| `leaderUrl`     | `http://localhost:8081` | `http://:8081` |\n| `followerUrl`   | `http://localhost:8082` | `http://:8082` |\n| `leaderlessUrl` | `http://localhost:8091` | `http://:8091` |\n| `leaderlessUrl2`| `http://localhost:8092` | `http://:8092` |\n\n## Architectures\n\n### Leader-Follower (N=5)\n\n- lf1 (leader): port 8081\n    \n- lf2-lf5 (followers): ports 8082-8085\n    \n- Strategies: W5R1, W1R5, W3R3\n    \n\n### Leaderless (N=5, W=N, R=1)\n\n- ll1-ll5: ports 8091-8095\n    \n- Any node can coordinate writes\n    \n\n## Endpoints\n\n### Health\n\n- GET /health\n    \n\n### Key-Value Operations\n\n- POST /set\n    \n- GET /get?key=\n    \n- GET /local_read?key=\n    \n\n### Error Cases\n\n- POST /set with empty key (400)\n    \n- GET /get with missing key (400)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52400206",
+    "_collection_link": "https://go.postman.co/collection/52400206-ab62a556-016e-4ce5-87b1-0ba704334bdd?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Leader-Follower",
+      "item": [
+        {
+          "name": "Leader Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderUrl}}/health",
+              "host": [
+                "{{leaderUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Follower Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{followerUrl}}/health",
+              "host": [
+                "{{followerUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Key on Leader",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var body = pm.response.json();",
+                  "  pm.collectionVariables.set('test_key', 'demo');",
+                  "  pm.collectionVariables.set('test_version', body.version);",
+                  "  pm.test('Key written with version', function() {",
+                  "    pm.expect(body.version).to.not.be.undefined;",
+                  "    pm.expect(body.key).to.eql('demo');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"demo\",\n  \"value\": \"hello-world\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{leaderUrl}}/set",
+              "host": [
+                "{{leaderUrl}}"
+              ],
+              "path": [
+                "set"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Key from Leader",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Leader returns consistent value', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.value).to.eql('hello-world');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderUrl}}/get?key={{test_key}}",
+              "host": [
+                "{{leaderUrl}}"
+              ],
+              "path": [
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{test_key}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Key from Follower",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Follower returns consistent value after ack', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.value).to.eql('hello-world');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{followerUrl}}/get?key={{test_key}}",
+              "host": [
+                "{{followerUrl}}"
+              ],
+              "path": [
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{test_key}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Local Read on Follower",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{followerUrl}}/local_read?key={{test_key}}",
+              "host": [
+                "{{followerUrl}}"
+              ],
+              "path": [
+                "local_read"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{test_key}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Error Empty Key on Set",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"\",\n  \"value\": \"should-fail\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{leaderUrl}}/set",
+              "host": [
+                "{{leaderUrl}}"
+              ],
+              "path": [
+                "set"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Error Missing Key on Get",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderUrl}}/get",
+              "host": [
+                "{{leaderUrl}}"
+              ],
+              "path": [
+                "get"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Error Key Not Found",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderUrl}}/get?key=nonexistent-key-xyz",
+              "host": [
+                "{{leaderUrl}}"
+              ],
+              "path": [
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "nonexistent-key-xyz"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leaderless",
+      "item": [
+        {
+          "name": "Node 1 Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderlessUrl}}/health",
+              "host": [
+                "{{leaderlessUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Key via Node 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var body = pm.response.json();",
+                  "  pm.collectionVariables.set('ll_key', 'll-demo');",
+                  "  pm.collectionVariables.set('ll_version', body.version);",
+                  "  pm.test('Write coordinated with version', function() {",
+                  "    pm.expect(body.coordinator).to.not.be.undefined;",
+                  "    pm.expect(body.version).to.not.be.undefined;",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"ll-demo\",\n  \"value\": \"leaderless-value\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{leaderlessUrl}}/set",
+              "host": [
+                "{{leaderlessUrl}}"
+              ],
+              "path": [
+                "set"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Key from Coordinator",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderlessUrl}}/get?key={{ll_key}}",
+              "host": [
+                "{{leaderlessUrl}}"
+              ],
+              "path": [
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{ll_key}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Key from Different Node",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{leaderlessUrl2}}/get?key={{ll_key}}",
+              "host": [
+                "{{leaderlessUrl2}}"
+              ],
+              "path": [
+                "get"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{ll_key}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "test_key",
+      "value": ""
+    },
+    {
+      "key": "test_version",
+      "value": ""
+    },
+    {
+      "key": "ll_key",
+      "value": ""
+    },
+    {
+      "key": "ll_version",
+      "value": ""
+    }
+  ]
+}
