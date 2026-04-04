@@ -1,0 +1,97 @@
+services:
+  lf1:
+    build: .
+    environment:
+      MODE: leader-follower
+      STRATEGY: ${STRATEGY:-W5R1}
+      LEADER_URL: http://lf1:8080
+      NODES: http://lf1:8080,http://lf2:8080,http://lf3:8080,http://lf4:8080,http://lf5:8080
+      NODE_ID: lf1
+      SELF_URL: http://lf1:8080
+    ports: ["8081:8080"]
+  lf2:
+    build: .
+    environment:
+      MODE: leader-follower
+      STRATEGY: ${STRATEGY:-W5R1}
+      LEADER_URL: http://lf1:8080
+      NODES: http://lf1:8080,http://lf2:8080,http://lf3:8080,http://lf4:8080,http://lf5:8080
+      NODE_ID: lf2
+      SELF_URL: http://lf2:8080
+    ports: ["8082:8080"]
+  lf3:
+    build: .
+    environment:
+      MODE: leader-follower
+      STRATEGY: ${STRATEGY:-W5R1}
+      LEADER_URL: http://lf1:8080
+      NODES: http://lf1:8080,http://lf2:8080,http://lf3:8080,http://lf4:8080,http://lf5:8080
+      NODE_ID: lf3
+      SELF_URL: http://lf3:8080
+    ports: ["8083:8080"]
+  lf4:
+    build: .
+    environment:
+      MODE: leader-follower
+      STRATEGY: ${STRATEGY:-W5R1}
+      LEADER_URL: http://lf1:8080
+      NODES: http://lf1:8080,http://lf2:8080,http://lf3:8080,http://lf4:8080,http://lf5:8080
+      NODE_ID: lf4
+      SELF_URL: http://lf4:8080
+    ports: ["8084:8080"]
+  lf5:
+    build: .
+    environment:
+      MODE: leader-follower
+      STRATEGY: ${STRATEGY:-W5R1}
+      LEADER_URL: http://lf1:8080
+      NODES: http://lf1:8080,http://lf2:8080,http://lf3:8080,http://lf4:8080,http://lf5:8080
+      NODE_ID: lf5
+      SELF_URL: http://lf5:8080
+    ports: ["8085:8080"]
+
+  ll1:
+    build: .
+    profiles: ["leaderless"]
+    environment:
+      MODE: leaderless
+      NODES: http://ll1:8080,http://ll2:8080,http://ll3:8080,http://ll4:8080,http://ll5:8080
+      NODE_ID: ll1
+      SELF_URL: http://ll1:8080
+    ports: ["8091:8080"]
+  ll2:
+    build: .
+    profiles: ["leaderless"]
+    environment:
+      MODE: leaderless
+      NODES: http://ll1:8080,http://ll2:8080,http://ll3:8080,http://ll4:8080,http://ll5:8080
+      NODE_ID: ll2
+      SELF_URL: http://ll2:8080
+    ports: ["8092:8080"]
+  ll3:
+    build: .
+    profiles: ["leaderless"]
+    environment:
+      MODE: leaderless
+      NODES: http://ll1:8080,http://ll2:8080,http://ll3:8080,http://ll4:8080,http://ll5:8080
+      NODE_ID: ll3
+      SELF_URL: http://ll3:8080
+    ports: ["8093:8080"]
+  ll4:
+    build: .
+    profiles: ["leaderless"]
+    environment:
+      MODE: leaderless
+      NODES: http://ll1:8080,http://ll2:8080,http://ll3:8080,http://ll4:8080,http://ll5:8080
+      NODE_ID: ll4
+      SELF_URL: http://ll4:8080
+    ports: ["8094:8080"]
+  ll5:
+    build: .
+    profiles: ["leaderless"]
+    environment:
+      MODE: leaderless
+      NODES: http://ll1:8080,http://ll2:8080,http://ll3:8080,http://ll4:8080,http://ll5:8080
+      NODE_ID: ll5
+      SELF_URL: http://ll5:8080
+    ports: ["8095:8080"]
