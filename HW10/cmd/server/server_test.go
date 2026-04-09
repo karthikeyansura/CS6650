@@ -1,4 +1,4 @@
-// Server tests using httptest.
+// Unit tests using httptest.
 package main
 
 import (
