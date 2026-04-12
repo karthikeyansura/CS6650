@@ -109,7 +109,7 @@ func (h *Handler) ListAlbums(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadPhoto accepts a multipart photo upload.
-// Critical flow: allocate seq synchronously, stream to S3, persist metadata, enqueue job, return 202.
+// Critical flow: allocate seq synchronously, stream to S3, persist metadata, complete inline or enqueue, return 202.
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	albumID := r.PathValue("album_id")
 
@@ -168,17 +168,25 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// enqueue worker job via SQS
-	job := &model.PhotoJob{
-		AlbumID: albumID,
-		PhotoID: photoID,
-		S3Key:   s3Key,
-	}
-	if err := h.Queue.Enqueue(r.Context(), job); err != nil {
-		slog.Error("sqs enqueue", "album_id", albumID, "photo_id", photoID, "error", err)
-		_ = h.Store.FailPhoto(r.Context(), albumID, photoID)
-		writeError(w, http.StatusInternalServerError, "queue error")
-		return
+	// optimistic inline completion: object is already in S3; finish by writing URL + completed in Dynamo.
+	// On failure, enqueue to SQS so the worker retries (durability / throttling / races).
+	objectURL := h.Blob.ObjectURL(s3Key)
+	completionErr := h.Store.CompletePhoto(r.Context(), albumID, photoID, objectURL)
+	if completionErr != nil {
+		slog.Warn("inline completion failed, falling back to SQS",
+			"album_id", albumID, "photo_id", photoID, "error", completionErr)
+
+		job := &model.PhotoJob{
+			AlbumID: albumID,
+			PhotoID: photoID,
+			S3Key:   s3Key,
+		}
+		if enqueueErr := h.Queue.Enqueue(r.Context(), job); enqueueErr != nil {
+			slog.Error("sqs enqueue fallback failed", "album_id", albumID, "photo_id", photoID, "error", enqueueErr)
+			_ = h.Store.FailPhoto(r.Context(), albumID, photoID)
+			writeError(w, http.StatusInternalServerError, "processing error")
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusAccepted, model.PhotoAccepted{
