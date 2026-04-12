@@ -109,7 +109,7 @@ func (h *Handler) ListAlbums(w http.ResponseWriter, r *http.Request) {
 }
 
 // UploadPhoto accepts a multipart photo upload.
-// Critical flow: allocate seq synchronously, stream to S3, persist metadata, complete inline or enqueue, return 202.
+// Critical flow: allocate seq synchronously, stream to S3, persist metadata, enqueue job, return 202.
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	albumID := r.PathValue("album_id")
 
@@ -168,11 +168,16 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// optimistic inline completion: object is already in S3; finish by writing URL + completed in Dynamo.
-	// On failure, enqueue to SQS so the worker retries (durability / throttling / races).
+	// optimistic inline completion: the file is already in S3, the only "processing"
+	// work is generating the URL and updating DynamoDB status to completed.
+	// attempt this inline to eliminate SQS round-trip latency on the happy path.
+	// if this fails, fall back to SQS so the worker retries with full durability.
 	objectURL := h.Blob.ObjectURL(s3Key)
 	completionErr := h.Store.CompletePhoto(r.Context(), albumID, photoID, objectURL)
+
 	if completionErr != nil {
+		// inline completion failed (transient DynamoDB error or delete race)
+		// enqueue to SQS for the worker to retry with backoff and DLQ safety
 		slog.Warn("inline completion failed, falling back to SQS",
 			"album_id", albumID, "photo_id", photoID, "error", completionErr)
 
