@@ -9,8 +9,8 @@ echo "Logging into ECR..."
 aws ecr get-login-password --region "${REGION}" | \
   docker login --username AWS --password-stdin "${ECR_REGISTRY}"
 
-echo "Building API image..."
-docker build --platform linux/amd64 \
+echo "Building API image (no cache)..."
+docker build --platform linux/amd64 --no-cache \
   -t "${ECR_REGISTRY}/album-store-api:latest" \
   -f deployments/docker/Dockerfile.api \
   .
@@ -18,8 +18,8 @@ docker build --platform linux/amd64 \
 echo "Pushing API image..."
 docker push "${ECR_REGISTRY}/album-store-api:latest"
 
-echo "Building worker image..."
-docker build --platform linux/amd64 \
+echo "Building worker image (no cache)..."
+docker build --platform linux/amd64 --no-cache \
   -t "${ECR_REGISTRY}/album-store-worker:latest" \
   -f deployments/docker/Dockerfile.worker \
   .
