@@ -50,7 +50,10 @@ func main() {
 	}
 
 	dynamoClient := dynamodb.NewFromConfig(awsCfg)
-	s3Client := s3.NewFromConfig(awsCfg)
+	// enable S3 Transfer Acceleration for faster uploads under concurrent load
+	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.UseAccelerate = true
+	})
 	sqsClient := sqs.NewFromConfig(awsCfg)
 
 	dynamoStore := store.NewDynamoStore(dynamoClient, cfg.AlbumsTable, cfg.CountersTable, cfg.PhotosTable)

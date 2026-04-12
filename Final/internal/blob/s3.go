@@ -62,9 +62,10 @@ func (s *S3Client) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// ObjectURL returns the public URL for an S3 object.
+// ObjectURL returns the public URL for an S3 object via the accelerate endpoint.
+// S3 Transfer Acceleration serves both uploads and downloads through CloudFront edges.
 func (s *S3Client) ObjectURL(key string) string {
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, s.region, key)
+	return fmt.Sprintf("https://%s.s3-accelerate.amazonaws.com/%s", s.bucket, key)
 }
 
 // HeadObject checks whether an object exists in S3.
