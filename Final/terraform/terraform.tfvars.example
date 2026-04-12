@@ -6,7 +6,7 @@ environment  = "prod"
 # api_image    = "<account_id>.dkr.ecr.us-west-2.amazonaws.com/album-store-api:latest"
 # worker_image = "<account_id>.dkr.ecr.us-west-2.amazonaws.com/album-store-worker:latest"
 
-api_desired_count    = 4
+api_desired_count    = 6
 worker_desired_count = 12
 api_cpu              = 1024
 api_memory           = 2048
