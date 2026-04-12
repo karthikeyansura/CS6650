@@ -19,10 +19,11 @@ type S3Client struct {
 
 func NewS3Client(client *s3.Client, bucket, region string) *S3Client {
 	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
-		// 5MB part size: smaller parts upload faster individually and allow more parallelism
+		// 5MB part size for parallelism on large files
 		u.PartSize = 5 * 1024 * 1024
-		// 10 concurrent part uploads to saturate network bandwidth on large files
-		u.Concurrency = 10
+		// 5 concurrent part uploads to balance throughput vs CPU contention
+		// higher values (10+) cause context switching overhead on 512-1024 CPU Fargate tasks
+		u.Concurrency = 5
 	})
 	return &S3Client{
 		client:   client,
@@ -33,7 +34,6 @@ func NewS3Client(client *s3.Client, bucket, region string) *S3Client {
 }
 
 // Upload streams a reader to S3 using the multipart upload manager.
-// Does not buffer the entire file in memory.
 func (s *S3Client) Upload(ctx context.Context, key string, body io.Reader, contentType string) error {
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -50,8 +50,7 @@ func (s *S3Client) Upload(ctx context.Context, key string, body io.Reader, conte
 	return nil
 }
 
-// Delete removes an object from S3. Treats a missing object as success
-// because S3 DeleteObject is idempotent and returns 204 even if key does not exist.
+// Delete removes an object from S3. Treats a missing object as success.
 func (s *S3Client) Delete(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: &s.bucket,
@@ -64,7 +63,6 @@ func (s *S3Client) Delete(ctx context.Context, key string) error {
 }
 
 // ObjectURL returns the public URL for an S3 object.
-// Requires the bucket to have a public read policy or the object to have public-read ACL.
 func (s *S3Client) ObjectURL(key string) string {
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, s.region, key)
 }
