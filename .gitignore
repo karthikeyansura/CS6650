@@ -21,3 +21,10 @@ HW/Keys/
 **/__pycache__/
 *.pyc
 HW8/src/server
+bin/
+vendor/
+.env
+*.env
+.vscode/
+*.swp
+*.swo
