@@ -1,0 +1,10 @@
+bin/
+terraform/
+locust/
+scripts/
+docs/
+.git/
+.gitignore
+.env
+*.md
+Makefile
