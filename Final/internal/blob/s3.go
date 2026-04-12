@@ -34,6 +34,7 @@ func NewS3Client(client *s3.Client, bucket, region string) *S3Client {
 }
 
 // Upload streams a reader to S3 using the multipart upload manager.
+// Uses Transfer Acceleration when the S3 client is configured with UseAccelerate.
 func (s *S3Client) Upload(ctx context.Context, key string, body io.Reader, contentType string) error {
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -62,10 +63,11 @@ func (s *S3Client) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// ObjectURL returns the public URL for an S3 object via the accelerate endpoint.
-// S3 Transfer Acceleration serves both uploads and downloads through CloudFront edges.
+// ObjectURL returns the public URL for an S3 object via the standard regional endpoint.
+// Transfer Acceleration is used for uploads only; the public read URL uses the standard
+// domain because S3 bucket policies apply consistently on the regional endpoint.
 func (s *S3Client) ObjectURL(key string) string {
-	return fmt.Sprintf("https://%s.s3-accelerate.amazonaws.com/%s", s.bucket, key)
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, s.region, key)
 }
 
 // HeadObject checks whether an object exists in S3.
