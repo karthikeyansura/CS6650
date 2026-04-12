@@ -95,7 +95,7 @@ func pollLoop(ctx context.Context, workerID int, sqsClient *sqs.Client, queueURL
 		out, err := sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl:            &queueURL,
 			MaxNumberOfMessages: 10,
-			WaitTimeSeconds:     5,
+			WaitTimeSeconds:     20,
 			VisibilityTimeout:   120,
 		})
 		if err != nil {
