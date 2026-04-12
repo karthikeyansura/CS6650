@@ -8,6 +8,11 @@ resource "aws_s3_bucket" "photos" {
   tags = { Name = "${var.project_name}-photos" }
 }
 
+resource "aws_s3_bucket_accelerate_configuration" "photos" {
+  bucket = aws_s3_bucket.photos.id
+  status = "Enabled"
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "photos" {
   bucket = aws_s3_bucket.photos.id
   rule {
@@ -55,3 +60,4 @@ resource "aws_s3_bucket_policy" "photos_public_read" {
 
 output "bucket_name" { value = aws_s3_bucket.photos.id }
 output "bucket_arn" { value = aws_s3_bucket.photos.arn }
+output "bucket_accelerate_domain" { value = "${aws_s3_bucket.photos.id}.s3-accelerate.amazonaws.com" }
