@@ -7,7 +7,7 @@ variable "sqs_queue_name" { type = string }
 # API autoscaling
 resource "aws_appautoscaling_target" "api" {
   max_capacity       = 15
-  min_capacity       = 6
+  min_capacity       = 10
   resource_id        = "service/${var.ecs_cluster_name}/${var.api_service_name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
