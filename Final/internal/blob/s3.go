@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -47,6 +48,26 @@ func (s *S3Client) Upload(ctx context.Context, key string, body io.Reader, conte
 	})
 	if err != nil {
 		return fmt.Errorf("s3 upload %s: %w", key, err)
+	}
+	return nil
+}
+
+// UploadBytes uses a direct PutObject with known ContentLength.
+// Bypasses the multipart upload manager overhead for files already in memory.
+// Single HTTP request with Content-Length lets S3 process without chunked transfer negotiation.
+func (s *S3Client) UploadBytes(ctx context.Context, key string, data []byte, contentType string) error {
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:        &s.bucket,
+		Key:           &key,
+		Body:          bytes.NewReader(data),
+		ContentType:   &contentType,
+		ContentLength: aws.Int64(int64(len(data))),
+	})
+	if err != nil {
+		return fmt.Errorf("s3 put %s: %w", key, err)
 	}
 	return nil
 }
