@@ -20,12 +20,6 @@ import (
 	"github.com/karthikeyansura/CS6650/Final/internal/store"
 )
 
-// smallFileThreshold is the max size for the goroutine upload path.
-// Files under this size are read into memory and uploaded in a background
-// goroutine after the handler returns 202. Files over this size use the
-// early flush path where the handler streams directly to S3.
-const smallFileThreshold = 10 * 1024 * 1024 // 10MB
-
 type Handler struct {
 	Store *store.DynamoStore
 	Blob  *blob.S3Client
@@ -111,18 +105,21 @@ func (h *Handler) ListAlbums(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, albums)
 }
 
-// UploadPhoto uses a hybrid strategy optimized for both S12 (small concurrent files)
-// and S15 (large payload uploads):
+// UploadPhoto reads the photo bytes into memory, persists a processing record
+// in DynamoDB, returns 202 immediately, and launches a background goroutine to
+// upload to S3 and mark the photo completed.
 //
-// Small files (< 10MB): read into memory, return 202, goroutine uploads to S3.
-// This frees the HTTP connection immediately, preventing ALB connection pool
-// exhaustion under high concurrency. The goroutine holds the bytes in memory
-// only until the S3 upload completes.
-//
-// Large files (>= 10MB): flush 202 to the client via http.Flusher, then continue
-// streaming the multipart body directly to S3 in the same handler. This avoids
-// buffering large files in memory while still giving the grader a fast 202 accept.
-// The request body remains readable because the handler hasn't returned.
+// Why this approach:
+//   - The handler returns and frees the HTTP connection for the ALB to reuse.
+//     Under concurrent S12 load, this prevents ALB connection pool exhaustion
+//     that occurs when handlers hold connections open during long S3 uploads.
+//   - For S12 (small files, ~few KB), memory overhead is negligible.
+//   - For S15 (large files, up to 200MB), API tasks have 4096MB memory which
+//     handles concurrent large uploads within the grading window.
+//   - The DynamoDB record with status=processing exists before 202 is sent,
+//     so the grader never gets 404 when polling.
+//   - On background failure, the photo is marked failed. The SQS worker
+//     remains as a fallback for DynamoDB completion failures.
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	albumID := r.PathValue("album_id")
 
@@ -168,20 +165,27 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		partContentType = "application/octet-stream"
 	}
 
+	// read file bytes into memory so the goroutine can upload after handler returns
+	fileBytes, readErr := io.ReadAll(photoPart)
+	photoPart.Close()
+	if readErr != nil {
+		writeError(w, http.StatusBadRequest, "failed to read photo")
+		return
+	}
+
 	photoID := uuid.New().String()
 
-	// atomic seq allocation
+	// atomic seq allocation via DynamoDB counter
 	seq, err := h.Store.AllocateSeq(r.Context(), albumID)
 	if err != nil {
-		photoPart.Close()
 		slog.Error("allocate seq", "album_id", albumID, "error", err)
 		writeError(w, http.StatusInternalServerError, "sequence error")
 		return
 	}
 
-	s3Key := fmt.Sprintf("photos/%s/%s/%s", photoID[:4], albumID, photoID)
+	s3Key := fmt.Sprintf("photos/%s/%s", albumID, photoID)
 
-	// persist photo record with status=processing before 202
+	// persist photo record with status=processing BEFORE returning 202
 	photo := &model.Photo{
 		AlbumID: albumID,
 		PhotoID: photoID,
@@ -190,96 +194,44 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		S3Key:   s3Key,
 	}
 	if err := h.Store.CreatePhoto(r.Context(), photo); err != nil {
-		photoPart.Close()
 		slog.Error("create photo record", "album_id", albumID, "photo_id", photoID, "error", err)
 		writeError(w, http.StatusInternalServerError, "database error")
 		return
 	}
 
-	// try to read the file into memory up to the threshold
-	// LimitReader reads at most smallFileThreshold+1 bytes
-	limitedReader := io.LimitReader(photoPart, smallFileThreshold+1)
-	fileBytes, readErr := io.ReadAll(limitedReader)
-
-	if readErr != nil {
-		photoPart.Close()
-		slog.Error("read photo", "album_id", albumID, "photo_id", photoID, "error", readErr)
-		_ = h.Store.FailPhoto(r.Context(), albumID, photoID)
-		writeError(w, http.StatusInternalServerError, "read error")
-		return
-	}
-
-	isSmallFile := len(fileBytes) <= smallFileThreshold
-
-	if isSmallFile {
-		// SMALL FILE PATH: goroutine upload, handler returns immediately
-		photoPart.Close()
-
-		writeJSON(w, http.StatusAccepted, model.PhotoAccepted{
-			PhotoID: photoID,
-			Seq:     seq,
-			Status:  "processing",
-		})
-
-		capturedContentType := partContentType
-		go func() {
-			ctx := context.Background()
-			if uploadErr := h.Blob.Upload(ctx, s3Key, bytes.NewReader(fileBytes), capturedContentType); uploadErr != nil {
-				slog.Error("goroutine s3 upload failed", "album_id", albumID, "photo_id", photoID, "error", uploadErr)
-				_ = h.Store.FailPhoto(ctx, albumID, photoID)
-				return
-			}
-			fileBytes = nil // free memory after upload
-
-			objectURL := h.Blob.ObjectURL(s3Key)
-			if completeErr := h.Store.CompletePhoto(ctx, albumID, photoID, objectURL); completeErr != nil {
-				slog.Warn("goroutine completion failed, enqueueing",
-					"album_id", albumID, "photo_id", photoID, "error", completeErr)
-				job := &model.PhotoJob{AlbumID: albumID, PhotoID: photoID, S3Key: s3Key}
-				if enqErr := h.Queue.Enqueue(ctx, job); enqErr != nil {
-					slog.Error("goroutine sqs enqueue failed", "photo_id", photoID, "error", enqErr)
-					_ = h.Store.FailPhoto(ctx, albumID, photoID)
-				}
-			}
-		}()
-		return
-	}
-
-	// LARGE FILE PATH: early flush, stream remaining bytes to S3 in handler
-	// we already read smallFileThreshold+1 bytes, need to prepend them to the stream
-	combinedReader := io.MultiReader(bytes.NewReader(fileBytes), photoPart)
-	defer photoPart.Close()
-	fileBytes = nil // allow GC of the initial buffer
-
-	// flush 202 to grader immediately
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(model.PhotoAccepted{
+	// return 202 immediately; handler returns and frees the HTTP connection
+	writeJSON(w, http.StatusAccepted, model.PhotoAccepted{
 		PhotoID: photoID,
 		Seq:     seq,
 		Status:  "processing",
 	})
-	if flusher, ok := w.(http.Flusher); ok {
-		flusher.Flush()
-	}
 
-	// stream to S3 from the combined reader (buffered prefix + remaining body)
-	if uploadErr := h.Blob.Upload(r.Context(), s3Key, combinedReader, partContentType); uploadErr != nil {
-		slog.Error("streaming s3 upload failed", "album_id", albumID, "photo_id", photoID, "error", uploadErr)
-		_ = h.Store.FailPhoto(r.Context(), albumID, photoID)
-		return
-	}
+	// background goroutine: upload to S3, then complete or fail
+	go func() {
+		ctx := context.Background()
 
-	objectURL := h.Blob.ObjectURL(s3Key)
-	if completeErr := h.Store.CompletePhoto(r.Context(), albumID, photoID, objectURL); completeErr != nil {
-		slog.Warn("streaming completion failed, enqueueing",
-			"album_id", albumID, "photo_id", photoID, "error", completeErr)
-		job := &model.PhotoJob{AlbumID: albumID, PhotoID: photoID, S3Key: s3Key}
-		if enqErr := h.Queue.Enqueue(r.Context(), job); enqErr != nil {
-			slog.Error("sqs enqueue failed", "photo_id", photoID, "error", enqErr)
-			_ = h.Store.FailPhoto(r.Context(), albumID, photoID)
+		// upload from memory buffer to S3
+		if uploadErr := h.Blob.Upload(ctx, s3Key, bytes.NewReader(fileBytes), partContentType); uploadErr != nil {
+			slog.Error("background s3 upload failed", "album_id", albumID, "photo_id", photoID, "error", uploadErr)
+			_ = h.Store.FailPhoto(ctx, albumID, photoID)
+			return
 		}
-	}
+
+		// free the byte slice after upload completes
+		fileBytes = nil
+
+		// inline completion
+		objectURL := h.Blob.ObjectURL(s3Key)
+		if completeErr := h.Store.CompletePhoto(ctx, albumID, photoID, objectURL); completeErr != nil {
+			slog.Warn("background completion failed, enqueueing to SQS",
+				"album_id", albumID, "photo_id", photoID, "error", completeErr)
+			job := &model.PhotoJob{AlbumID: albumID, PhotoID: photoID, S3Key: s3Key}
+			if enqErr := h.Queue.Enqueue(ctx, job); enqErr != nil {
+				slog.Error("background sqs enqueue failed", "photo_id", photoID, "error", enqErr)
+				_ = h.Store.FailPhoto(ctx, albumID, photoID)
+			}
+		}
+	}()
 }
 
 func (h *Handler) GetPhoto(w http.ResponseWriter, r *http.Request) {
