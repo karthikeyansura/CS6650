@@ -29,13 +29,15 @@ func main() {
 	cfg := config.Load()
 
 	// load AWS SDK config with custom HTTP transport for connection pooling
+	// MaxConnsPerHost: 0 removes the artificial ceiling on active connections
+	// so S3 multipart uploads under concurrent load do not queue internally
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion(cfg.Region),
 		awsconfig.WithHTTPClient(&http.Client{
 			Transport: &http.Transport{
-				MaxIdleConns:        500,
-				MaxIdleConnsPerHost: 200,
-				MaxConnsPerHost:     200,
+				MaxIdleConns:        4000,
+				MaxIdleConnsPerHost: 1000,
+				MaxConnsPerHost:     0,
 				IdleConnTimeout:     90 * time.Second,
 				DialContext: (&net.Dialer{
 					Timeout:   5 * time.Second,
