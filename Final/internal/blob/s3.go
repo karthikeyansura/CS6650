@@ -1,7 +1,6 @@
 package blob
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -20,11 +19,10 @@ type S3Client struct {
 
 func NewS3Client(client *s3.Client, bucket, region string) *S3Client {
 	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
-		// 5MB part size for parallelism on large files
+		// 5MB part size: smaller parts upload faster individually and allow more parallelism
 		u.PartSize = 5 * 1024 * 1024
-		// 5 concurrent part uploads to balance throughput vs CPU contention
-		// higher values (10+) cause context switching overhead on 512-1024 CPU Fargate tasks
-		u.Concurrency = 5
+		// 10 concurrent part uploads to saturate network bandwidth on large files
+		u.Concurrency = 10
 	})
 	return &S3Client{
 		client:   client,
@@ -35,7 +33,7 @@ func NewS3Client(client *s3.Client, bucket, region string) *S3Client {
 }
 
 // Upload streams a reader to S3 using the multipart upload manager.
-// Uses Transfer Acceleration when the S3 client is configured with UseAccelerate.
+// Does not buffer the entire file in memory.
 func (s *S3Client) Upload(ctx context.Context, key string, body io.Reader, contentType string) error {
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -52,27 +50,8 @@ func (s *S3Client) Upload(ctx context.Context, key string, body io.Reader, conte
 	return nil
 }
 
-// UploadBytes uses a direct PutObject with known ContentLength.
-// Bypasses the multipart upload manager overhead for files already in memory.
-// Single HTTP request with Content-Length lets S3 process without chunked transfer negotiation.
-func (s *S3Client) UploadBytes(ctx context.Context, key string, data []byte, contentType string) error {
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:        &s.bucket,
-		Key:           &key,
-		Body:          bytes.NewReader(data),
-		ContentType:   &contentType,
-		ContentLength: aws.Int64(int64(len(data))),
-	})
-	if err != nil {
-		return fmt.Errorf("s3 put %s: %w", key, err)
-	}
-	return nil
-}
-
-// Delete removes an object from S3. Treats a missing object as success.
+// Delete removes an object from S3. Treats a missing object as success
+// because S3 DeleteObject is idempotent and returns 204 even if key does not exist.
 func (s *S3Client) Delete(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: &s.bucket,
@@ -84,9 +63,8 @@ func (s *S3Client) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// ObjectURL returns the public URL for an S3 object via the standard regional endpoint.
-// Transfer Acceleration is used for uploads only; the public read URL uses the standard
-// domain because S3 bucket policies apply consistently on the regional endpoint.
+// ObjectURL returns the public URL for an S3 object.
+// Requires the bucket to have a public read policy or the object to have public-read ACL.
 func (s *S3Client) ObjectURL(key string) string {
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, s.region, key)
 }
