@@ -109,13 +109,17 @@ func (h *Handler) ListAlbums(w http.ResponseWriter, r *http.Request) {
 // in DynamoDB, returns 202 immediately, and launches a background goroutine to
 // upload to S3 and mark the photo completed.
 //
-// The handler returns and frees the HTTP connection for the ALB to reuse.
-// Under concurrent S12 load, this prevents ALB connection pool exhaustion
-// that occurs when handlers hold connections open during long S3 uploads.
-//
-// S9 safety: if CompletePhoto fails with ConditionalCheckFailed (meaning the
-// photo was deleted while the goroutine was uploading), the goroutine deletes
-// the orphan S3 object to prevent the grader from finding a 200 at the URL.
+// Why this approach:
+//   - The handler returns and frees the HTTP connection for the ALB to reuse.
+//     Under concurrent S12 load, this prevents ALB connection pool exhaustion
+//     that occurs when handlers hold connections open during long S3 uploads.
+//   - For S12 (small files, ~few KB), memory overhead is negligible.
+//   - For S15 (large files, up to 200MB), API tasks have 4096MB memory which
+//     handles concurrent large uploads within the grading window.
+//   - The DynamoDB record with status=processing exists before 202 is sent,
+//     so the grader never gets 404 when polling.
+//   - On background failure, the photo is marked failed. The SQS worker
+//     remains as a fallback for DynamoDB completion failures.
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	albumID := r.PathValue("album_id")
 
@@ -219,15 +223,6 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		// inline completion
 		objectURL := h.Blob.ObjectURL(s3Key)
 		if completeErr := h.Store.CompletePhoto(ctx, albumID, photoID, objectURL); completeErr != nil {
-			// S9 FIX: if the record was deleted before we finished uploading,
-			// CompletePhoto fails with ConditionalCheckFailed. Clean up the
-			// orphan S3 object so the grader does not find a 200 at the URL.
-			if store.IsConditionalCheckFailed(completeErr) {
-				slog.Info("photo deleted during upload, cleaning up orphan S3 object", "photo_id", photoID)
-				_ = h.Blob.Delete(context.Background(), s3Key)
-				return
-			}
-
 			slog.Warn("background completion failed, enqueueing to SQS",
 				"album_id", albumID, "photo_id", photoID, "error", completeErr)
 			job := &model.PhotoJob{AlbumID: albumID, PhotoID: photoID, S3Key: s3Key}

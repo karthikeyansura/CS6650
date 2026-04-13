@@ -28,14 +28,13 @@ func main() {
 
 	cfg := config.Load()
 
-	// match API connection pool settings for consistency
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
 		awsconfig.WithRegion(cfg.Region),
 		awsconfig.WithHTTPClient(&http.Client{
 			Transport: &http.Transport{
-				MaxIdleConns:        4000,
-				MaxIdleConnsPerHost: 1000,
-				MaxConnsPerHost:     0,
+				MaxIdleConns:        500,
+				MaxIdleConnsPerHost: 200,
+				MaxConnsPerHost:     200,
 				IdleConnTimeout:     90 * time.Second,
 				DialContext: (&net.Dialer{
 					Timeout:   5 * time.Second,
