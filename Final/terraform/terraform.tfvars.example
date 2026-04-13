@@ -8,7 +8,7 @@ environment  = "prod"
 
 api_desired_count    = 6
 worker_desired_count = 12
-api_cpu              = 1024
-api_memory           = 2048
+api_cpu              = 2048
+api_memory           = 4096
 worker_cpu           = 512
 worker_memory        = 1024
