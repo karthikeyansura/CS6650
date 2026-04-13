@@ -183,7 +183,7 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s3Key := fmt.Sprintf("photos/%s/%s", albumID, photoID)
+	s3Key := fmt.Sprintf("photos/%s/%s/%s", photoID[:4], albumID, photoID)
 
 	// persist photo record with status=processing BEFORE returning 202
 	photo := &model.Photo{
